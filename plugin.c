@@ -202,8 +202,8 @@ static void
       {
 	if(bilinear)
 	{
-	  float horizontal_interpolation_top = pixel[0][k] * x_offset + pixel[1][k] * (1.0f - x_offset);
-	  float horizontal_interpolation_bottom = pixel[2][k] * x_offset + pixel[3][k] * (1.0f - x_offset);
+	  float horizontal_interpolation_bottom = pixel[0][k] * (1.0f - x_offset) + pixel[1][k] * x_offset;
+	  float horizontal_interpolation_top = pixel[2][k] * (1.0f - x_offset) + pixel[3][k] * x_offset;
 	  float vertical_interpolation = horizontal_interpolation_top * y_offset + horizontal_interpolation_bottom * (1.0f - y_offset);
 	  output[k] = (guchar)vertical_interpolation;
 	}
