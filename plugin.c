@@ -154,6 +154,7 @@ static void
   center_x = (x1 + x2) / 2;
   center_y = (y1 + y2) / 2;
 
+  printf("x1 = %d, x2 = %d, y1 = %d, y2 = %d\n", x1, x2, y1, y2);
   printf("a = %f, b = %f\n", a, b);
 
 
