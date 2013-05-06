@@ -57,7 +57,7 @@ query (void)
                              "<Image>/Filters/Misc");
 }
 
-float a = 0, b = 0;
+float a = 0, b = 0, scale = 1000;
   
 
 gboolean dialog (GimpDrawable *drawable)
@@ -91,7 +91,7 @@ gboolean dialog (GimpDrawable *drawable)
      gtk_label_set_justify(GTK_LABEL (a_label), GTK_JUSTIFY_RIGHT);
     
      a_d = gimp_spin_button_new(&a_adj_d, 0,
-       -1, 1, 0.001, 0.001, 0, 13, 3);
+       -10, 10, 0.1, 0.1, 0, 13, 1);
      gtk_box_pack_start(GTK_BOX(main_vbox), a_d, FALSE, FALSE, 0);
      gtk_widget_show(a_d);
      g_signal_connect(a_adj_d, "value_changed",
@@ -106,12 +106,27 @@ gboolean dialog (GimpDrawable *drawable)
      gtk_label_set_justify(GTK_LABEL (b_label), GTK_JUSTIFY_RIGHT);
     
      b_d = gimp_spin_button_new(&b_adj_d, 0,
-       -1, 1, 0.001, 0.001, 0, 13, 3);
+       -4, 4, 0.01, 0.01, 0, 13, 2);
      gtk_box_pack_start(GTK_BOX(main_vbox), b_d, FALSE, FALSE, 0);
      gtk_widget_show(b_d);
      g_signal_connect(b_adj_d, "value_changed",
        G_CALLBACK(gimp_float_adjustment_update),
        &b);
+   }
+   
+   {
+     b_label = gtk_label_new_with_mnemonic("_scale:");
+     gtk_widget_show(b_label);
+     gtk_box_pack_start(GTK_BOX (main_vbox), b_label, FALSE, FALSE, 6);
+     gtk_label_set_justify(GTK_LABEL (b_label), GTK_JUSTIFY_RIGHT);
+    
+     b_d = gimp_spin_button_new(&b_adj_d, 1000,
+       -1000, 1000, 100, 100, 0, 13, 0);
+     gtk_box_pack_start(GTK_BOX(main_vbox), b_d, FALSE, FALSE, 0);
+     gtk_widget_show(b_d);
+     g_signal_connect(b_adj_d, "value_changed",
+       G_CALLBACK(gimp_float_adjustment_update),
+       &scale);
    }
    gtk_widget_show(dialog);
 
@@ -164,10 +179,10 @@ static void
     {
       float dx = (float)i - center_x;
       float dy = (float)j - center_y;
-      float radius = sqrtf(dx*dx + dy*dy);
+      float radius = sqrtf(dx*dx + dy*dy)/scale;
       float z = 1 + a*radius*radius + b*radius*radius*radius*radius;
-      float distortion_x = center_x + dx/z;
-      float distortion_y = center_y + dy/z;
+      float distortion_x = center_x + dx*z;
+      float distortion_y = center_y + dy*z;
       
       gint left_top_ngb_x = (gint)floor(distortion_x);
       gint left_top_ngb_y = (gint)floor(distortion_y);
