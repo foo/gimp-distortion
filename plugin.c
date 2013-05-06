@@ -1,4 +1,5 @@
 #include <libgimp/gimp.h>
+#include <libgimp/gimpui.h>
 
 static void query (void);
 static void run   (const gchar      *name,
@@ -56,6 +57,62 @@ query (void)
                              "<Image>/Filters/Misc");
 }
 
+int gpu, R;
+
+gboolean dialog (GimpDrawable *drawable)
+{
+   GtkWidget *dialog;
+   GtkWidget *main_vbox;
+   GtkWidget *main_hbox;
+   GtkWidget *gpu_button;
+   GtkWidget *radius_d_label;
+   GtkWidget *radius_d;
+   GtkObject *radius_adj_d;
+   gboolean   run;
+
+   gimp_ui_init("CPU/GPU Dialog", FALSE);
+   dialog = gimp_dialog_new("CPU/GPU Dialog", "CPU/GPU Dialog",
+                            NULL, (GtkDialogFlags) 0,
+                            gimp_standard_help_func, "plug-in-cuda-dialog",
+                            GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
+                            GTK_STOCK_OK,     GTK_RESPONSE_OK,
+                            NULL);
+   main_vbox = gtk_vbox_new(FALSE, 6);
+   gtk_container_add(GTK_CONTAINER(GTK_DIALOG (dialog)->vbox), main_vbox);
+   gtk_widget_show(main_vbox);
+
+   gpu_button = gtk_check_button_new_with_mnemonic("_Use GPU");
+   gtk_box_pack_start(GTK_BOX(main_vbox), gpu_button, FALSE, FALSE, 0);
+   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(gpu_button), TRUE);
+   gtk_widget_set_sensitive(gpu_button, TRUE);
+
+   g_signal_connect(gpu_button, "toggled",
+                    G_CALLBACK(gimp_toggle_button_update),
+                    &gpu);
+   gtk_widget_show(gpu_button);
+
+   // Radius input:
+   radius_d_label = gtk_label_new_with_mnemonic("_Extra value:");
+   gtk_widget_show(radius_d_label);
+   gtk_box_pack_start(GTK_BOX (main_vbox), radius_d_label, FALSE, FALSE, 6);
+   gtk_label_set_justify(GTK_LABEL (radius_d_label), GTK_JUSTIFY_RIGHT);
+    
+   radius_d = gimp_spin_button_new(&radius_adj_d, R,
+                                       1, 255, 1, 1, 0, 13, 0);
+   gtk_box_pack_start(GTK_BOX(main_vbox), radius_d, FALSE, FALSE, 0);
+   gtk_widget_show(radius_d);
+   g_signal_connect(radius_adj_d, "value_changed",
+                    G_CALLBACK(gimp_int_adjustment_update),
+                    &R);
+
+   gtk_widget_show(dialog);
+
+   run = (gimp_dialog_run(GIMP_DIALOG(dialog)) == GTK_RESPONSE_OK);
+
+   gtk_widget_destroy(dialog);
+   return run;
+}
+
 static void
   radial_distortion(GimpDrawable *drawable)
 {
@@ -89,7 +146,7 @@ static void
   center_x = (x1 + x2) / 2;
   center_y = (y1 + y2) / 2;
 
-  float a = 0.0001, b = 0.00;
+  float a = -0.0001, b = -0.001;
   
   for (i = x1; i < x2; i++)
   {
@@ -98,13 +155,10 @@ static void
       float dx = (float)i - center_x;
       float dy = (float)j - center_y;
       float radius = sqrtf(dx*dx + dy*dy);
-      float distortion_radius = radius * (1 + a*radius*radius + b*radius*radius*radius*radius);
-      float normalized_dx = dx / radius;
-      float normalized_dy = dy / radius;
-      float distortion_dx = normalized_dx * distortion_radius;
-      float distortion_dy = normalized_dy * distortion_radius;
-      float distortion_x = center_x + distortion_dx;
-      float distortion_y = center_y + distortion_dy;
+      float z = 1000 + a*radius*radius + b*radius*radius*radius*radius;
+      float s = -1000/z;
+      float distortion_x = center_x + dx*s;
+      float distortion_y = center_y + dy*s;
       
       gint left_top_ngb_x = (gint)distortion_x;
       gint left_top_ngb_y = (gint)distortion_y;
@@ -197,6 +251,10 @@ run (const gchar      *name,
    *   GTimer timer = g_timer_new time ();
    */
 
+  if (run_mode == GIMP_RUN_INTERACTIVE) {
+    dialog(drawable);
+  }
+  
   radial_distortion(drawable);
 
   /*   g_print ("blur() took %g seconds.\n", g_timer_elapsed (timer));
