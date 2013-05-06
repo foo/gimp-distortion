@@ -89,16 +89,16 @@ static void
   center_x = (x1 + x2) / 2;
   center_y = (y1 + y2) / 2;
 
-  float a = 2, b = 2;
+  float a = 0.0001, b = 0.00;
   
   for (i = x1; i < x2; i++)
   {
     for (j = y1; j < y2; j++)
     {
-      float dx = i - center_x;
-      float dy = j - center_y;
+      float dx = (float)i - center_x;
+      float dy = (float)j - center_y;
       float radius = sqrtf(dx*dx + dy*dy);
-      float distortion_radius = 1 + a*radius*radius + b*radius*radius*radius*radius;
+      float distortion_radius = radius * (1 + a*radius*radius + b*radius*radius*radius*radius);
       float normalized_dx = dx / radius;
       float normalized_dy = dy / radius;
       float distortion_dx = normalized_dx * distortion_radius;
@@ -115,25 +115,28 @@ static void
       // get pixels around new radius
       guchar pixel[4][4];
 
+      printf("ltn: %d %d\n", 	MAX(x1, MIN(left_top_ngb_x, x2)),
+	MAX(y1, MIN(left_top_ngb_y, y2)));
+
       gimp_pixel_rgn_get_pixel(&rgn_in,
 	pixel[0],
-	MAX(x1, MIN(left_top_ngb_x, x2)),
-	MAX(y1, MIN(left_top_ngb_y, y2)));
+	MAX(x1, MIN(left_top_ngb_x, x2 - 1)),
+	MAX(y1, MIN(left_top_ngb_y, y2 - 1)));
 
       gimp_pixel_rgn_get_pixel(&rgn_in,
 	pixel[1],
-	MAX(x1, MIN(left_top_ngb_x + 1, x2)),
-	MAX(y1, MIN(left_top_ngb_y, y2)));
+	MAX(x1, MIN(left_top_ngb_x + 1, x2 - 1)),
+	MAX(y1, MIN(left_top_ngb_y, y2 - 1)));
 
       gimp_pixel_rgn_get_pixel(&rgn_in,
 	pixel[2],
-	MAX(x1, MIN(left_top_ngb_x, x2)),
-	MAX(y1, MIN(left_top_ngb_y + 1, y2)));
+	MAX(x1, MIN(left_top_ngb_x, x2 - 1)),
+	MAX(y1, MIN(left_top_ngb_y + 1, y2 - 1)));
 
       gimp_pixel_rgn_get_pixel(&rgn_in,
 	pixel[3],
-	MAX(x1, MIN(left_top_ngb_x + 1, x2)),
-	MAX(y1, MIN(left_top_ngb_y + 1, y2)));
+	MAX(x1, MIN(left_top_ngb_x + 1, x2 - 1)),
+	MAX(y1, MIN(left_top_ngb_y + 1, y2 - 1)));
 
       for (k = 0; k < channels; k++)
       {
