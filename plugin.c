@@ -57,106 +57,107 @@ query (void)
 }
 
 static void
-  blur (GimpDrawable *drawable)
+  radial_distortion(GimpDrawable *drawable)
 {
- gint         i, j, k, channels;
-        gint         x1, y1, x2, y2;
-        GimpPixelRgn rgn_in, rgn_out;
-        guchar       output[4];
+  gint         i, j, k, channels;
+  gint         x1, y1, x2, y2, center_x, center_y;
+  GimpPixelRgn rgn_in, rgn_out;
+  guchar       output[4];
 
-        /* Gets upper left and lower right coordinates,
-         * and layers number in the image */
-        gimp_drawable_mask_bounds (drawable->drawable_id,
-                                   &x1, &y1,
-                                   &x2, &y2);
-        channels = gimp_drawable_bpp (drawable->drawable_id);
+  /* Gets upper left and lower right coordinates,
+   * and layers number in the image */
+  gimp_drawable_mask_bounds (drawable->drawable_id,
+    &x1, &y1,
+    &x2, &y2);
+  channels = gimp_drawable_bpp (drawable->drawable_id);
 
-        /* Initialises two PixelRgns, one to read original data,
-         * and the other to write output data. That second one will
-         * be merged at the end by the call to
-         * gimp_drawable_merge_shadow() */
-        gimp_pixel_rgn_init (&rgn_in,
-                             drawable,
-                             x1, y1,
-                             x2 - x1, y2 - y1, 
-                             FALSE, FALSE);
-        gimp_pixel_rgn_init (&rgn_out,
-                             drawable,
-                             x1, y1,
-                             x2 - x1, y2 - y1, 
-                             TRUE, TRUE);
+  /* Initialises two PixelRgns, one to read original data,
+   * and the other to write output data. That second one will
+   * be merged at the end by the call to
+   * gimp_drawable_merge_shadow() */
+  gimp_pixel_rgn_init (&rgn_in,
+    drawable,
+    x1, y1,
+    x2 - x1, y2 - y1, 
+    FALSE, FALSE);
+  gimp_pixel_rgn_init (&rgn_out,
+    drawable,
+    x1, y1,
+    x2 - x1, y2 - y1, 
+    TRUE, TRUE);
 
-        for (i = x1; i < x2; i++)
-          {
-            for (j = y1; j < y2; j++)
-              {
-                guchar pixel[9][4];
+  center_x = (x1 + x2) / 2;
+  center_y = (y1 + y2) / 2;
 
-                /* Get nine pixels */
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[0],
-                                          MAX (i - 1, x1),
-                                          MAX (j - 1, y1));
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[1],
-                                          MAX (i - 1, x1),
-                                          j);
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[2],
-                                          MAX (i - 1, x1),
-                                          MIN (j + 1, y2 - 1));
+  float a = 2, b = 2;
+  
+  for (i = x1; i < x2; i++)
+  {
+    for (j = y1; j < y2; j++)
+    {
+      float dx = i - center_x;
+      float dy = j - center_y;
+      float radius = sqrtf(dx*dx + dy*dy);
+      float distortion_radius = 1 + a*radius*radius + b*radius*radius*radius*radius;
+      float normalized_dx = dx / radius;
+      float normalized_dy = dy / radius;
+      float distortion_dx = normalized_dx * distortion_radius;
+      float distortion_dy = normalized_dy * distortion_radius;
+      float distortion_x = center_x + distortion_dx;
+      float distortion_y = center_y + distortion_dy;
+      
+      gint left_top_ngb_x = (gint)distortion_x;
+      gint left_top_ngb_y = (gint)distortion_y;
 
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[3],
-                                          i,
-                                          MAX (j - 1, y1));
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[4],
-                                          i,
-                                          j);
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[5],
-                                          i,
-                                          MIN (j + 1, y2 - 1));
+      float x_offset = distortion_x - (float)left_top_ngb_x;
+      float y_offset = distortion_y - (float)left_top_ngb_y;
 
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[6],
-                                          MIN (i + 1, x2 - 1),
-                                          MAX (j - 1, y1));
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[7],
-                                          MIN (i + 1, x2 - 1),
-                                          j);
-                gimp_pixel_rgn_get_pixel (&rgn_in,
-                                          pixel[8],
-                                          MIN (i + 1, x2 - 1),
-                                          MIN (j + 1, y2 - 1));
+      // get pixels around new radius
+      guchar pixel[4][4];
 
-                /* For each layer, compute the average of the
-                 * nine */
-                for (k = 0; k < channels; k++)
-                  {
-                    int tmp, sum = 0;
-                    for (tmp = 0; tmp < 9; tmp++)
-                      sum += pixel[tmp][k];
-                    output[k] = sum / 9;
-                  }
+      gimp_pixel_rgn_get_pixel(&rgn_in,
+	pixel[0],
+	MAX(x1, MIN(left_top_ngb_x, x2)),
+	MAX(y1, MIN(left_top_ngb_y, y2)));
 
-                gimp_pixel_rgn_set_pixel (&rgn_out,
-                                          output,
-                                          i, j);
-              }
+      gimp_pixel_rgn_get_pixel(&rgn_in,
+	pixel[1],
+	MAX(x1, MIN(left_top_ngb_x + 1, x2)),
+	MAX(y1, MIN(left_top_ngb_y, y2)));
 
-            if (i % 10 == 0)
-              gimp_progress_update ((gdouble) (i - x1) / (gdouble) (x2 - x1));
-          }
+      gimp_pixel_rgn_get_pixel(&rgn_in,
+	pixel[2],
+	MAX(x1, MIN(left_top_ngb_x, x2)),
+	MAX(y1, MIN(left_top_ngb_y + 1, y2)));
 
-        /*  Update the modified region */
-        gimp_drawable_flush (drawable);
-        gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
-        gimp_drawable_update (drawable->drawable_id,
-                              x1, y1,
-                              x2 - x1, y2 - y1);
+      gimp_pixel_rgn_get_pixel(&rgn_in,
+	pixel[3],
+	MAX(x1, MIN(left_top_ngb_x + 1, x2)),
+	MAX(y1, MIN(left_top_ngb_y + 1, y2)));
+
+      for (k = 0; k < channels; k++)
+      {
+	float horizontal_interpolation_top = pixel[0][k] * x_offset + pixel[1][k] * (1.0f - x_offset);
+	float horizontal_interpolation_bottom = pixel[2][k] * x_offset + pixel[3][k] * (1.0f - x_offset);
+	float vertical_interpolation = horizontal_interpolation_top * y_offset + horizontal_interpolation_bottom * (1.0f - y_offset);
+	output[k] = (guchar)vertical_interpolation;
+      }
+
+      gimp_pixel_rgn_set_pixel (&rgn_out,
+	output,
+	i, j);
+    }
+
+    if (i % 10 == 0)
+      gimp_progress_update ((gdouble) (i - x1) / (gdouble) (x2 - x1));
+  }
+
+  /*  Update the modified region */
+  gimp_drawable_flush (drawable);
+  gimp_drawable_merge_shadow (drawable->drawable_id, TRUE);
+  gimp_drawable_update (drawable->drawable_id,
+    x1, y1,
+    x2 - x1, y2 - y1);
 }
 
 static void
@@ -186,14 +187,14 @@ run (const gchar      *name,
   /*  Get the specified drawable  */
   drawable = gimp_drawable_get (param[2].data.d_drawable);
 
-  gimp_progress_init ("My Blur...");
+  gimp_progress_init ("Creating radial distortion...");
 
   /* Let's time blur
    *
    *   GTimer timer = g_timer_new time ();
    */
 
-  blur (drawable);
+  radial_distortion(drawable);
 
   /*   g_print ("blur() took %g seconds.\n", g_timer_elapsed (timer));
    *   g_timer_destroy (timer);
