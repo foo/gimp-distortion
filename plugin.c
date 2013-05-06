@@ -57,7 +57,7 @@ query (void)
                              "<Image>/Filters/Misc");
 }
 
-float a = -0.0001, b = -0.001;
+float a = 0, b = 0;
   
 
 gboolean dialog (GimpDrawable *drawable)
@@ -91,7 +91,7 @@ gboolean dialog (GimpDrawable *drawable)
      gtk_label_set_justify(GTK_LABEL (a_label), GTK_JUSTIFY_RIGHT);
     
      a_d = gimp_spin_button_new(&a_adj_d, 0,
-       -10, 10, 0.01, 0.01, 0, 13, 2);
+       -1, 1, 0.001, 0.001, 0, 13, 3);
      gtk_box_pack_start(GTK_BOX(main_vbox), a_d, FALSE, FALSE, 0);
      gtk_widget_show(a_d);
      g_signal_connect(a_adj_d, "value_changed",
@@ -106,7 +106,7 @@ gboolean dialog (GimpDrawable *drawable)
      gtk_label_set_justify(GTK_LABEL (b_label), GTK_JUSTIFY_RIGHT);
     
      b_d = gimp_spin_button_new(&b_adj_d, 0,
-       -10, 10, 0.01, 0.01, 0, 13, 2);
+       -1, 1, 0.001, 0.001, 0, 13, 3);
      gtk_box_pack_start(GTK_BOX(main_vbox), b_d, FALSE, FALSE, 0);
      gtk_widget_show(b_d);
      g_signal_connect(b_adj_d, "value_changed",
@@ -125,7 +125,7 @@ static void
   radial_distortion(GimpDrawable *drawable)
 {
   gint         i, j, k, channels;
-  gint         x1, y1, x2, y2, center_x, center_y;
+  gint         x1, y1, x2, y2;
   GimpPixelRgn rgn_in, rgn_out;
   guchar       output[4];
 
@@ -151,12 +151,12 @@ static void
     x2 - x1, y2 - y1, 
     TRUE, TRUE);
 
-  center_x = (x1 + x2) / 2;
-  center_y = (y1 + y2) / 2;
+  float center_x = (x1 + x2) / 2;
+  float center_y = (y1 + y2) / 2;
 
   printf("x1 = %d, x2 = %d, y1 = %d, y2 = %d\n", x1, x2, y1, y2);
   printf("a = %f, b = %f\n", a, b);
-
+  const int bilinear = 1;
 
   for (i = x1; i < x2; i++)
   {
@@ -165,13 +165,12 @@ static void
       float dx = (float)i - center_x;
       float dy = (float)j - center_y;
       float radius = sqrtf(dx*dx + dy*dy);
-      float z = 1000 + a*radius*radius + b*radius*radius*radius*radius;
-      float s = -1000/z;
-      float distortion_x = center_x + dx*s;
-      float distortion_y = center_y + dy*s;
+      float z = 1 + a*radius*radius + b*radius*radius*radius*radius;
+      float distortion_x = center_x + dx/z;
+      float distortion_y = center_y + dy/z;
       
-      gint left_top_ngb_x = (gint)distortion_x;
-      gint left_top_ngb_y = (gint)distortion_y;
+      gint left_top_ngb_x = (gint)floor(distortion_x);
+      gint left_top_ngb_y = (gint)floor(distortion_y);
 
       float x_offset = distortion_x - (float)left_top_ngb_x;
       float y_offset = distortion_y - (float)left_top_ngb_y;
@@ -201,10 +200,17 @@ static void
 
       for (k = 0; k < channels; k++)
       {
-	float horizontal_interpolation_top = pixel[0][k] * x_offset + pixel[1][k] * (1.0f - x_offset);
-	float horizontal_interpolation_bottom = pixel[2][k] * x_offset + pixel[3][k] * (1.0f - x_offset);
-	float vertical_interpolation = horizontal_interpolation_top * y_offset + horizontal_interpolation_bottom * (1.0f - y_offset);
-	output[k] = (guchar)vertical_interpolation;
+	if(bilinear)
+	{
+	  float horizontal_interpolation_top = pixel[0][k] * x_offset + pixel[1][k] * (1.0f - x_offset);
+	  float horizontal_interpolation_bottom = pixel[2][k] * x_offset + pixel[3][k] * (1.0f - x_offset);
+	  float vertical_interpolation = horizontal_interpolation_top * y_offset + horizontal_interpolation_bottom * (1.0f - y_offset);
+	  output[k] = (guchar)vertical_interpolation;
+	}
+	else
+	{
+	  output[k] = pixel[0][k];
+	}
       }
 
       gimp_pixel_rgn_set_pixel (&rgn_out,
