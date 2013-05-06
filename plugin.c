@@ -40,19 +40,19 @@ query (void)
   };
 
   gimp_install_procedure (
-    "plug-in-hello",
-    "Hello, world!",
-    "Displays \"Hello, world!\" in a dialog",
-    "David Neary",
-    "Copyright David Neary",
-    "2004",
-    "_Hello world...",
+    "radial-distortion-ip",
+    "Radial distortion.",
+    "Corrects radial distortion.",
+    "MP",
+    "Copyright MP",
+    "2013",
+    "_Radial Distortion...",
     "RGB*, GRAY*",
     GIMP_PLUGIN,
     G_N_ELEMENTS (args), 0,
     args, NULL);
 
-  gimp_plugin_menu_register ("plug-in-hello",
+  gimp_plugin_menu_register ("radial-distortion-ip",
                              "<Image>/Filters/Misc");
 }
 
