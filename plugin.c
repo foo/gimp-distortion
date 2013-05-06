@@ -57,23 +57,26 @@ query (void)
                              "<Image>/Filters/Misc");
 }
 
-int gpu, R;
+float a = -0.0001, b = -0.001;
+  
 
 gboolean dialog (GimpDrawable *drawable)
 {
    GtkWidget *dialog;
    GtkWidget *main_vbox;
    GtkWidget *main_hbox;
-   GtkWidget *gpu_button;
-   GtkWidget *radius_d_label;
-   GtkWidget *radius_d;
-   GtkObject *radius_adj_d;
+   GtkWidget *a_label;
+   GtkWidget *a_d;
+   GtkObject *a_adj_d;
+   GtkWidget *b_label;
+   GtkWidget *b_d;
+   GtkObject *b_adj_d;
    gboolean   run;
 
-   gimp_ui_init("CPU/GPU Dialog", FALSE);
-   dialog = gimp_dialog_new("CPU/GPU Dialog", "CPU/GPU Dialog",
+   gimp_ui_init("Radial Distortion Dialog", FALSE);
+   dialog = gimp_dialog_new("Radial Distortion Dialog", "Radial Distortion Dialog",
                             NULL, (GtkDialogFlags) 0,
-                            gimp_standard_help_func, "plug-in-cuda-dialog",
+                            gimp_standard_help_func, "radial-distortion-ip",
                             GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                             GTK_STOCK_OK,     GTK_RESPONSE_OK,
                             NULL);
@@ -81,30 +84,35 @@ gboolean dialog (GimpDrawable *drawable)
    gtk_container_add(GTK_CONTAINER(GTK_DIALOG (dialog)->vbox), main_vbox);
    gtk_widget_show(main_vbox);
 
-   gpu_button = gtk_check_button_new_with_mnemonic("_Use GPU");
-   gtk_box_pack_start(GTK_BOX(main_vbox), gpu_button, FALSE, FALSE, 0);
-   gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(gpu_button), TRUE);
-   gtk_widget_set_sensitive(gpu_button, TRUE);
-
-   g_signal_connect(gpu_button, "toggled",
-                    G_CALLBACK(gimp_toggle_button_update),
-                    &gpu);
-   gtk_widget_show(gpu_button);
-
-   // Radius input:
-   radius_d_label = gtk_label_new_with_mnemonic("_Extra value:");
-   gtk_widget_show(radius_d_label);
-   gtk_box_pack_start(GTK_BOX (main_vbox), radius_d_label, FALSE, FALSE, 6);
-   gtk_label_set_justify(GTK_LABEL (radius_d_label), GTK_JUSTIFY_RIGHT);
+   {
+     a_label = gtk_label_new_with_mnemonic("_a:");
+     gtk_widget_show(a_label);
+     gtk_box_pack_start(GTK_BOX (main_vbox), a_label, FALSE, FALSE, 6);
+     gtk_label_set_justify(GTK_LABEL (a_label), GTK_JUSTIFY_RIGHT);
     
-   radius_d = gimp_spin_button_new(&radius_adj_d, R,
-                                       1, 255, 1, 1, 0, 13, 0);
-   gtk_box_pack_start(GTK_BOX(main_vbox), radius_d, FALSE, FALSE, 0);
-   gtk_widget_show(radius_d);
-   g_signal_connect(radius_adj_d, "value_changed",
-                    G_CALLBACK(gimp_int_adjustment_update),
-                    &R);
+     a_d = gimp_spin_button_new(&a_adj_d, 0,
+       -10, 10, 0.01, 0.01, 0, 13, 2);
+     gtk_box_pack_start(GTK_BOX(main_vbox), a_d, FALSE, FALSE, 0);
+     gtk_widget_show(a_d);
+     g_signal_connect(a_adj_d, "value_changed",
+       G_CALLBACK(gimp_float_adjustment_update),
+       &a);
+   }
 
+   {
+     b_label = gtk_label_new_with_mnemonic("_b:");
+     gtk_widget_show(b_label);
+     gtk_box_pack_start(GTK_BOX (main_vbox), b_label, FALSE, FALSE, 6);
+     gtk_label_set_justify(GTK_LABEL (b_label), GTK_JUSTIFY_RIGHT);
+    
+     b_d = gimp_spin_button_new(&b_adj_d, 0,
+       -10, 10, 0.01, 0.01, 0, 13, 2);
+     gtk_box_pack_start(GTK_BOX(main_vbox), b_d, FALSE, FALSE, 0);
+     gtk_widget_show(b_d);
+     g_signal_connect(b_adj_d, "value_changed",
+       G_CALLBACK(gimp_float_adjustment_update),
+       &b);
+   }
    gtk_widget_show(dialog);
 
    run = (gimp_dialog_run(GIMP_DIALOG(dialog)) == GTK_RESPONSE_OK);
@@ -146,8 +154,9 @@ static void
   center_x = (x1 + x2) / 2;
   center_y = (y1 + y2) / 2;
 
-  float a = -0.0001, b = -0.001;
-  
+  printf("a = %f, b = %f\n", a, b);
+
+
   for (i = x1; i < x2; i++)
   {
     for (j = y1; j < y2; j++)
@@ -168,9 +177,6 @@ static void
 
       // get pixels around new radius
       guchar pixel[4][4];
-
-      printf("ltn: %d %d\n", 	MAX(x1, MIN(left_top_ngb_x, x2)),
-	MAX(y1, MIN(left_top_ngb_y, y2)));
 
       gimp_pixel_rgn_get_pixel(&rgn_in,
 	pixel[0],
